@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Confirm Your Email</title>
+  <meta name="description" content="Confirms the email address of a LangStudio account.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header><img src="icon.png" alt=""><a href="./">LangStudio</a></header>
+  <h1 id="title">Confirming your email…</h1>
+
+  <div class="card">
+    <p id="message">One moment.</p>
+  </div>
+
+  <p class="updated">LangStudio, by Naim Yachou Chiva</p>
+</main>
+
+<script>
+  // The link in LangStudio's confirmation email lands here, with `userId`
+  // and `secret` (Appwrite's). Confirming needs no session: the secret is
+  // the proof. The project id and the endpoint are public; nothing secret
+  // is on this page. For Appwrite to answer this page, naimyc.github.io
+  // must be a Web platform of the project (Console → Overview → Platforms).
+  const endpoint = 'https://fra.cloud.appwrite.io/v1';
+  const project = 'langstudio';
+
+  const title = document.getElementById('title');
+  const message = document.getElementById('message');
+
+  function show(heading, text) {
+    title.textContent = heading;
+    message.textContent = text;
+  }
+
+  async function confirmEmail() {
+    const query = new URLSearchParams(location.search);
+    const userId = query.get('userId');
+    const secret = query.get('secret');
+    if (!userId || !secret) {
+      show('This link is incomplete',
+        'Open the link from the email again, or tap “Send again” in the app.');
+      return;
+    }
+    try {
+      const response = await fetch(endpoint + '/account/verifications/email', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Appwrite-Project': project,
+        },
+        body: JSON.stringify({ userId, secret }),
+      });
+      if (response.ok) {
+        show('Your email is confirmed',
+          'Go back to LangStudio: it opens by itself (or tap “I’ve confirmed”).');
+        return;
+      }
+      const answer = await response.json().catch(() => ({}));
+      if (answer.type === 'user_invalid_token' || response.status === 401) {
+        show('This link has expired',
+          'Links work once and only for a while. In the app, tap “Send again” for a new one.');
+      } else {
+        show('Your email could not be confirmed',
+          'Try the link again in a moment, or tap “Send again” in the app.');
+      }
+    } catch (_) {
+      show('No connection',
+        'Check your internet connection and open the link again.');
+    }
+  }
+
+  confirmEmail();
+</script>
+</body>
+</html>
