@@ -6,73 +6,200 @@
   <title>Confirm Your Email</title>
   <meta name="description" content="Confirms the email address of a LangStudio account.">
   <meta name="robots" content="noindex">
+  <!-- The confirmation code is in this page's address: never sent on to
+       another site, whatever the page might link to one day. -->
+  <meta name="referrer" content="no-referrer">
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
   <link rel="stylesheet" href="style.css">
+  <style>
+    body { min-height: 100vh; display: flex; align-items: center; }
+    main.confirm { width: 100%; max-width: 440px; padding: 24px 16px 48px; }
+    .brand { display: flex; align-items: center; justify-content: center;
+      gap: 10px; margin-bottom: 20px; font-weight: 800; font-size: 18px; }
+    .brand img { width: 36px; height: 36px; border-radius: 9px; }
+    .panel { background: #fff; border: 1px solid var(--line); border-radius: 20px;
+      padding: 32px 24px 28px; text-align: center;
+      box-shadow: 0 12px 32px rgba(31, 36, 48, 0.06); }
+    .mark { width: 64px; height: 64px; margin: 0 auto 18px; border-radius: 50%;
+      display: grid; place-items: center; font-size: 30px; font-weight: 800;
+      color: #fff; transition: background 0.3s; }
+    .mark.busy { background: #eef0f5; }
+    .mark.busy::after { content: ""; width: 28px; height: 28px; border-radius: 50%;
+      border: 3px solid #c9cdd8; border-top-color: var(--accent);
+      animation: spin 0.9s linear infinite; }
+    .mark.done { background: #2e6b34; }
+    .mark.stop { background: #b7791f; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { font-size: 23px; margin: 0 0 8px; }
+    .message { color: var(--soft); margin: 0; }
+    .next { margin: 22px 0 0; padding: 14px 16px; border-radius: 14px;
+      background: #f4f6fb; color: var(--ink); font-size: 15px; }
+    .next[hidden] { display: none; }
+    .foot { text-align: center; color: var(--soft); font-size: 13px; margin-top: 18px; }
+    .foot a { color: var(--soft); }
+    @media (prefers-reduced-motion: reduce) {
+      .mark.busy::after { animation-duration: 3s; }
+    }
+  </style>
 </head>
 <body>
-<main>
-  <header><img src="icon.png" alt=""><a href="./">LangStudio</a></header>
-  <h1 id="title">Confirming your email…</h1>
+<main class="confirm">
+  <div class="brand"><img src="icon.png" alt="">LangStudio</div>
 
-  <div class="card">
-    <p id="message">One moment.</p>
-  </div>
+  <section class="panel" aria-live="polite">
+    <div id="mark" class="mark busy" aria-hidden="true"></div>
+    <h1 id="title"></h1>
+    <p id="message" class="message"></p>
+    <p id="next" class="next" hidden></p>
+  </section>
 
-  <p class="updated">LangStudio, by Naim Yachou Chiva</p>
+  <p class="foot"><a href="privacy.html">Privacy</a></p>
 </main>
 
 <script>
-  // The link in LangStudio's confirmation email lands here, with `userId`
-  // and `secret` (Appwrite's). Confirming needs no session: the secret is
-  // the proof. The project id and the endpoint are public; nothing secret
-  // is on this page. For Appwrite to answer this page, naimyc.github.io
-  // must be a Web platform of the project (Console → Overview → Platforms).
+  // The link in LangStudio's confirmation email lands here with `userId`
+  // and `secret` (Appwrite's one-time code). Confirming needs no session:
+  // the code is the proof. The project id and the endpoint are public;
+  // nothing secret is in this page. naimyc.github.io must be a Web platform
+  // of the Appwrite project, or Appwrite neither sends the link nor answers
+  // this page.
   const endpoint = 'https://fra.cloud.appwrite.io/v1';
   const project = 'langstudio';
 
-  const title = document.getElementById('title');
-  const message = document.getElementById('message');
+  // In the visitor's language when it is one of the app's.
+  const text = {
+    en: {
+      busy: ['Confirming your email…', 'One moment.'],
+      done: ['Your email is confirmed', 'Thank you — your account is ready.',
+        'Go back to LangStudio: it opens by itself, or tap “I’ve confirmed”.'],
+      used: ['This link has expired', 'Links work once and only for a while.',
+        'In the app, tap “Send again” for a new one.'],
+      broken: ['This link is incomplete', 'Part of it is missing.',
+        'Open the link from the email again, or tap “Send again” in the app.'],
+      failed: ['Your email could not be confirmed', 'Something went wrong on our side.',
+        'Try the link again in a moment, or tap “Send again” in the app.'],
+      offline: ['No connection', 'This page could not reach our server.',
+        'Check your internet connection and open the link again.'],
+    },
+    es: {
+      busy: ['Confirmando tu correo…', 'Un momento.'],
+      done: ['Tu correo está confirmado', 'Gracias: tu cuenta está lista.',
+        'Vuelve a LangStudio: se abre sola, o toca «Ya lo he confirmado».'],
+      used: ['Este enlace ha caducado', 'Los enlaces sirven una vez y por un tiempo.',
+        'En la app, toca «Enviar de nuevo» para recibir otro.'],
+      broken: ['Este enlace está incompleto', 'Le falta una parte.',
+        'Abre de nuevo el enlace del correo, o toca «Enviar de nuevo» en la app.'],
+      failed: ['No se pudo confirmar tu correo', 'Algo ha fallado por nuestra parte.',
+        'Prueba el enlace de nuevo en un momento, o toca «Enviar de nuevo» en la app.'],
+      offline: ['Sin conexión', 'Esta página no pudo contactar con nuestro servidor.',
+        'Revisa tu conexión a internet y abre el enlace otra vez.'],
+    },
+    de: {
+      busy: ['Deine E-Mail wird bestätigt …', 'Einen Moment.'],
+      done: ['Deine E-Mail ist bestätigt', 'Danke – dein Konto ist bereit.',
+        'Geh zurück zu LangStudio: Die App öffnet sich von selbst, oder tippe auf „Ich habe bestätigt“.'],
+      used: ['Dieser Link ist abgelaufen', 'Links gelten nur einmal und nur eine Weile.',
+        'Tippe in der App auf „Erneut senden“ für einen neuen.'],
+      broken: ['Dieser Link ist unvollständig', 'Ein Teil fehlt.',
+        'Öffne den Link aus der E-Mail noch einmal oder tippe in der App auf „Erneut senden“.'],
+      failed: ['Deine E-Mail konnte nicht bestätigt werden', 'Bei uns ist etwas schiefgegangen.',
+        'Versuch den Link gleich noch einmal oder tippe in der App auf „Erneut senden“.'],
+      offline: ['Keine Verbindung', 'Diese Seite hat unseren Server nicht erreicht.',
+        'Prüfe deine Internetverbindung und öffne den Link noch einmal.'],
+    },
+    fr: {
+      busy: ['Confirmation de ton e-mail…', 'Un instant.'],
+      done: ['Ton e-mail est confirmé', 'Merci : ton compte est prêt.',
+        'Retourne dans LangStudio : elle s’ouvre toute seule, ou touche « C’est confirmé ».'],
+      used: ['Ce lien a expiré', 'Les liens ne servent qu’une fois, et pour un temps.',
+        'Dans l’app, touche « Renvoyer » pour en recevoir un nouveau.'],
+      broken: ['Ce lien est incomplet', 'Il en manque une partie.',
+        'Ouvre à nouveau le lien de l’e-mail, ou touche « Renvoyer » dans l’app.'],
+      failed: ['Ton e-mail n’a pas pu être confirmé', 'Un problème est survenu de notre côté.',
+        'Réessaie le lien dans un instant, ou touche « Renvoyer » dans l’app.'],
+      offline: ['Pas de connexion', 'Cette page n’a pas pu joindre notre serveur.',
+        'Vérifie ta connexion internet et ouvre à nouveau le lien.'],
+    },
+    it: {
+      busy: ['Conferma della tua email…', 'Un momento.'],
+      done: ['La tua email è confermata', 'Grazie: il tuo account è pronto.',
+        'Torna su LangStudio: si apre da sola, oppure tocca «Ho confermato».'],
+      used: ['Questo link è scaduto', 'I link valgono una volta e per poco tempo.',
+        'Nell’app, tocca «Invia di nuovo» per riceverne uno nuovo.'],
+      broken: ['Questo link è incompleto', 'Ne manca una parte.',
+        'Apri di nuovo il link dell’email, oppure tocca «Invia di nuovo» nell’app.'],
+      failed: ['Non è stato possibile confermare la tua email', 'Qualcosa è andato storto da parte nostra.',
+        'Riprova il link tra un momento, oppure tocca «Invia di nuovo» nell’app.'],
+      offline: ['Nessuna connessione', 'Questa pagina non ha raggiunto il nostro server.',
+        'Controlla la connessione a internet e apri di nuovo il link.'],
+    },
+    pt: {
+      busy: ['A confirmar o teu e-mail…', 'Um momento.'],
+      done: ['O teu e-mail está confirmado', 'Obrigado: a tua conta está pronta.',
+        'Volta ao LangStudio: abre sozinho, ou toca em «Já confirmei».'],
+      used: ['Este link expirou', 'Os links servem uma vez e por pouco tempo.',
+        'Na app, toca em «Enviar de novo» para receberes outro.'],
+      broken: ['Este link está incompleto', 'Falta uma parte.',
+        'Abre de novo o link do e-mail, ou toca em «Enviar de novo» na app.'],
+      failed: ['Não foi possível confirmar o teu e-mail', 'Algo correu mal do nosso lado.',
+        'Tenta o link de novo daqui a pouco, ou toca em «Enviar de novo» na app.'],
+      offline: ['Sem ligação', 'Esta página não conseguiu contactar o nosso servidor.',
+        'Verifica a tua ligação à internet e abre o link outra vez.'],
+    },
+    ru: {
+      busy: ['Подтверждаем твою почту…', 'Секунду.'],
+      done: ['Почта подтверждена', 'Спасибо — аккаунт готов.',
+        'Вернись в LangStudio: приложение откроется само, или нажми «Я подтвердил».'],
+      used: ['Ссылка устарела', 'Ссылка работает один раз и недолго.',
+        'В приложении нажми «Отправить ещё раз», чтобы получить новую.'],
+      broken: ['Ссылка неполная', 'Части не хватает.',
+        'Открой ссылку из письма ещё раз или нажми «Отправить ещё раз» в приложении.'],
+      failed: ['Не удалось подтвердить почту', 'Что-то пошло не так на нашей стороне.',
+        'Попробуй ссылку чуть позже или нажми «Отправить ещё раз» в приложении.'],
+      offline: ['Нет подключения', 'Страница не смогла связаться с нашим сервером.',
+        'Проверь подключение к интернету и открой ссылку снова.'],
+    },
+  };
+  const lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+  const words = text[lang] || text.en;
+  document.documentElement.lang = text[lang] ? lang : 'en';
 
-  function show(heading, text) {
-    title.textContent = heading;
-    message.textContent = text;
+  const mark = document.getElementById('mark');
+  function show(state) {
+    const [title, message, next] = words[state];
+    document.getElementById('title').textContent = title;
+    document.getElementById('message').textContent = message;
+    const nextEl = document.getElementById('next');
+    nextEl.textContent = next || '';
+    nextEl.hidden = !next;
+    mark.className = 'mark ' + (state === 'busy' ? 'busy' : state === 'done' ? 'done' : 'stop');
+    mark.textContent = state === 'busy' ? '' : state === 'done' ? '✓' : '!';
+    document.title = title;
   }
 
   async function confirmEmail() {
+    show('busy');
     const query = new URLSearchParams(location.search);
     const userId = query.get('userId');
     const secret = query.get('secret');
-    if (!userId || !secret) {
-      show('This link is incomplete',
-        'Open the link from the email again, or tap “Send again” in the app.');
-      return;
-    }
+    // Read once, then out of the address bar: the code is not left in the
+    // browser's history, nor in a screenshot of the page.
+    history.replaceState(null, '', location.pathname);
+    if (!userId || !secret) return show('broken');
+
     try {
       const response = await fetch(endpoint + '/account/verifications/email', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Appwrite-Project': project,
-        },
+        headers: { 'Content-Type': 'application/json', 'X-Appwrite-Project': project },
         body: JSON.stringify({ userId, secret }),
+        referrerPolicy: 'no-referrer',
       });
-      if (response.ok) {
-        show('Your email is confirmed',
-          'Go back to LangStudio: it opens by itself (or tap “I’ve confirmed”).');
-        return;
-      }
+      if (response.ok) return show('done');
       const answer = await response.json().catch(() => ({}));
-      if (answer.type === 'user_invalid_token' || response.status === 401) {
-        show('This link has expired',
-          'Links work once and only for a while. In the app, tap “Send again” for a new one.');
-      } else {
-        show('Your email could not be confirmed',
-          'Try the link again in a moment, or tap “Send again” in the app.');
-      }
+      show(answer.type === 'user_invalid_token' || response.status === 401 ? 'used' : 'failed');
     } catch (_) {
-      show('No connection',
-        'Check your internet connection and open the link again.');
+      show('offline');
     }
   }
 
